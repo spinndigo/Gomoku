@@ -1,0 +1,149 @@
+
+
+
+
+/*
+by Joseph Spinosa
+
+Client login will appear in the server side of the code. That is, it will be interacted with in the subserver() method:
+it will return to the server the location(returnLoc) of the player in the binary file to be interacted with when a game is complete that is, in the subserved method, we may say: playerLoc = clientLogin(…) and then that variable should be tied somehow
+to the appropriate reply_sock_fd so when that player competes a game, their appropriate score is updated in memory
+Many method calls rely on code I have written for asgn4. 
+
+
+*/
+
+int clientLogin(int reply_sock_fd, int bfd){   // bfd is the binary file descriptor holding the records
+     char *buffer[256]; // by convention
+     char *last[20]; 
+     char *id[10]; 
+
+     char * login_msg = “Welcome! Please type 1 to login as an existing player, 2 if you are a new player, or 3 to quit”;
+     int login_stat = 0; // controls the while loop. When this gets 1, we have either logged in or created a new player
+     int bytes_recv, bytes_sent, ID, s, playerLoc; // s just holds results of non-void methods
+     
+     bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0); // This will be the very first thing received by the client
+     while ( login_stat == 0){
+             bytes_recv = recv(reply_sock_fd, buffer, (BUFFERSIZE+1), 0); // hopefully a 1, 2, or 3
+              if( strcmp(buffer, “1”) == 0){  // tier 1 if
+                  strcpy( buffer, “Please enter last name then id: \n”);
+                  bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                  bytes_recv = recv(reply_sock_fd, last, (sizeof(last)+1), 0); // their login info
+                  bytes_recv = recv(reply_sock_fd, id, (sizeof(id)+1), 0);  // get their id
+                  ID = id - ‘0’; // get the true id
+                  if((playerLoc = checkLogin( ID, last, bfd, head)) != -1){   // tier 2 if
+                      strcpy(buffer, “Welcome back <lastname>!\n”);
+                      bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                      login_stat = 1;
+                  }
+                  else{ strcpy(buffer, “Error: Player not found, please try again\n”);   // tier 2 else
+                           bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                         }
+              else if(strcmp(buffer, “2”) == 0){  // tier 1 else if
+                  strcpy(buffer, “please enter your last name: “);
+                  bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                  bytes_recv = recv(reply_sock_fd, last, (sizeof(last)), 0);
+                  ID = generateid(); // Matt method
+                  if((playerLoc = register(last, &head, bfd)) != -1){ // tier 2        // HERE
+                     strcpy(buffer, “thank you for signing up :)\n”);
+                     bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                     login_stat = 1;
+                  }
+                  else{ strcpy(buffer, “Error: please try again \n”); // tier 2
+                        bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                      }
+
+              else if(strcmp(buffer, “3”) == 0){  // tier 1 
+                  strcpy(buffer, “Goodbye”);
+                  bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                  // tell the client to exit somehow??
+                  stat = 1; // we don’t need to loop b/c client wants to quit
+              }
+
+              else { strcpy(buffer, “invalid input, please enter a number 1 thru 3”); // tier 1
+                     bytes_sent = send(reply_sock_fd, buffer, (BUFFERSIZE+1), 0);
+                   }
+        } //end the while
+
+return playerLoc;
+ 
+} //end the method
+
+
+// what follows are the methods checkLogin() and register() :
+
+int checkLogin(int ID, char *last, int bfd, pnode **head){
+     pnode *Lhead = **head;
+     int login_check, num;  // the return value
+     struct Player existingP;
+     if((login_check = isMem(ID, head) != -1){   // if true, this means the ID is in the list and therefore in the file
+         lseek(bfd, login_check*sizeof(struct Player), 0);
+         num = read(bfd, &existingP, sizeof(existingP));
+         if((strcmp(existingP.last, &last) == 0){  // if true, the ID is not only in the file, but matches the name of client (true login)
+            return login_check; // we have a match
+         }
+      }
+    
+      
+     return login_check; // if this return is hit, one of the two ifs above failed, therefore no match ( -1 if failure)
+}
+
+int register(char *last, pnode **head, int bfd){  // we don’t need ID, it hasn’t been generated yet
+    struct Player newP;  // we need a new node for the list
+    pnode *Lhead = **head; // add node needs the head of the list
+    pnode *new;
+    int newID = generateID(); // Matt method, create new random ID
+    new = (pnode *) malloc(sizeof(pnode));  // allocate space for the node
+    new->userid = newID;
+    if(addnode(new, head, bfd) != -1){   // -1 indicates the player already being there, e.g. the id is already there (unlikely)
+      newP.userid = newID;
+      newP.last = last;
+      newP.wins = 0;
+      newP.losses = 0;
+      newP.ties = 0;
+      addPlayer(newP, new->index, bfd); // add the player to the file this does the write
+      return new->index; // return the location of the player in the file
+     }
+ 
+    else{ return -1;} // failure for whatever reason
+}
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+    
+                  
+             
+     
